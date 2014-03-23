@@ -262,7 +262,7 @@ class ProxyHandler(BaseHTTPRequestHandler):
 					domain = domain.strip(' \t\r\n,;')
 					domain = domain + "." + self.server.config.hostname
 					c[cookiename]['domain'] = domain
-			cookie = c.OutputString()
+			cookie = c.output()
 		except Exception, e:
 			self.my_log_error(traceback.format_exc())
 			pass
@@ -345,7 +345,8 @@ class ProxyHandler(BaseHTTPRequestHandler):
 			if k in ["content-length", "server", "date", "content-encoding", "transfer-encoding"]:
 				continue
 			elif k == "set-cookie":
-				v = self.rewrite_cookie(v)
+				headerstr += self.rewrite_cookie(v)+"\r\n"
+				continue
 			elif k == "location" and resp.newlocation:
 				v = resp.newlocation
 
