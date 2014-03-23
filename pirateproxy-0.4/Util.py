@@ -2,7 +2,6 @@
 import urlparse
 import traceback
 
-
 # Strip the proxy hostname part of the passed URL
 def rewrite_URL_strip(url, config):
 	try:
@@ -23,7 +22,7 @@ def rewrite_URL_strip(url, config):
 # Rewrite the URL and add the proxy's HTTP or HTTPS ports when necessary.
 # For absolute URLs without scheme, use the same scheme as used to access
 # the proxy (using the 'ssl' flag)
-def rewrite_URL(url, config, ssl):
+def rewrite_URL(url, config, ssl, remote_host):
 	try: 
 		# Strip our own hostname for the rewrites to work
 		url = rewrite_URL_strip(url,config)
@@ -54,26 +53,26 @@ def rewrite_URL(url, config, ssl):
 				return url
 
 		# Handle absolute HTTP or HTTPS URL
-		if res[1] and (res[0] == '' or res[0] == 'http' or res[0] == 'https'): 
-			newres = [ item for item in res ] 
-			host = res[1].split(":")[0]
+		newres = [ item for item in res ] 
+		host = res[1].split(":")[0]
 
-			# No scheme, use the scheme used to access proxy
-			if res[0] == '': # res[0] == scheme
-				if ssl:
-					newres[0]='https'
-				else:
-					newres[0]='http'
+		# No scheme, use the scheme used to access proxy
+		if res[0] == '': # res[0] == scheme
+			if ssl:
+				newres[0]='https'
+			else:
+				newres[0]='http'
 	
-			# Add port of proxy
-			if newres[0] == 'http':
-				port = config.http_port
-			elif newres[0] == 'https':
-				port = config.https_port
-
-			newres[1] = host + "." + config.hostname + ":" + str(port)
-			url = urlparse.urlunsplit(newres) 
+		# Add port of proxy
+		if newres[0] == 'http':
+			port = config.http_port
+		elif newres[0] == 'https':
+			port = config.https_port
+		newres[1] = config.hostname + ":" + str(port)
+		if host == '':
+			host = remote_host
+		newres[2] = host + newres[2]
+		url = urlparse.urlunsplit(newres) 
 	except Exception, e: 
 		pass
-	
 	return url

@@ -6,13 +6,14 @@ import Util
 class CSSPage:
 	BLKSIZE=65536
 
-	def __init__(self, config, ssl, reader, writer):
+	def __init__(self, config, ssl, reader, writer, remote_host):
 		self.config = config
 		self.ssl = ssl
 		self.reader = reader
 		self.writer = writer
 		self.input_buffer = ''
 		self.output_buffer = ''
+		self.remote_host = remote_host
 
 	def rewrite_re(self, m):
 		part1 = m.group(1) or ''
@@ -20,7 +21,7 @@ class CSSPage:
 		url = m.group(7) or ''
 		closer = m.group(9) or ''
 
-		return part1 + Util.rewrite_URL(scheme+"//"+url, self.config, self.ssl) + closer
+		return part1 + Util.rewrite_URL(scheme+"//"+url, self.config, self.ssl, self.remote_host) + closer
 
 	def rewrite(self):
 		pattern = r"(((background(-image)?\s*:)|@import)\s*(url)?\s*[('\"]+\s*)(https?:)?//([^\"')]+)(:\d+)?([)'\"]+)"

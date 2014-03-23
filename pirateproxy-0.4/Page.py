@@ -18,7 +18,7 @@ class Page(HtmlParser):
 	simple_attriburl_regex = re.compile(r"((https?:)//[^ \r\n<]+)", re.I|re.M|re.S)
 	counter = 0
 
-	def __init__(self, config, ssl, reader, writer):
+	def __init__(self, config, ssl, reader, writer, remote_host):
 		HtmlParser.__init__(self)
 		self.config = config
 		self.ssl = ssl
@@ -28,6 +28,7 @@ class Page(HtmlParser):
 		self.output_buffer = ''
 		self.state = -1
 		self.tags_and_attribs = self.create_tabs_and_attribs()
+		self.remote_host = remote_host
 
 	# Based on a list of tuples, create a hash-table with tagnames plus
 	# attrib names as keys
@@ -41,7 +42,7 @@ class Page(HtmlParser):
 
 	# Rewrite a matched URL attribute value snippet
 	def rewrite_url(self, m):
-		return Util.rewrite_URL(m.group(0), self.config, self.ssl)
+		return Util.rewrite_URL(m.group(0), self.config, self.ssl, self.remote_host)
 
 	def rewrite(self):
 		while True:
@@ -74,9 +75,9 @@ class Page(HtmlParser):
 		# or CSS data anymore. This is all handled in the JSPage and
 		# CSSPage classes.
 		if self.tag() == 'script':
-			p = JSPage(self.config, self.ssl, self.parsing_reader, self.buffered_writer)
+			p = JSPage(self.config, self.ssl, self.parsing_reader, self.buffered_writer, self.remote_host)
 		elif self.tag() == 'style':
-			p = CSSPage(self.config, self.ssl, self.parsing_reader, self.buffered_writer)
+			p = CSSPage(self.config, self.ssl, self.parsing_reader, self.buffered_writer, self.remote_host)
 		p.rewrite()
 
 
@@ -136,7 +137,7 @@ class Page(HtmlParser):
 			# this by using StringIO on the already read value
 			f = StringIO(self.input_buffer[:pos])
 			outf = StringIO()
-			p = CSSPage(self.config, self.ssl, f.read, outf.write)
+			p = CSSPage(self.config, self.ssl, f.read, outf.write, self.remote_host)
 			p.rewrite()
 			outf.seek(0)
 			self.output_buffer += outf.read()
@@ -148,7 +149,7 @@ class Page(HtmlParser):
 			# this by using StringIO on the already read value
 			f = StringIO(self.input_buffer[:pos])
 			outf = StringIO()
-			p = JSPage(self.config, self.ssl, f.read, outf.write)
+			p = JSPage(self.config, self.ssl, f.read, outf.write, self.remote_host)
 			p.rewrite()
 			outf.seek(0)
 			self.output_buffer += outf.read() + self.input_buffer[pos]
@@ -163,7 +164,7 @@ class Page(HtmlParser):
 			return
 
 		# Other URL-containing attributes
-		val = Util.rewrite_URL(self.input_buffer[:pos], self.config, self.ssl)
+		val = Util.rewrite_URL(self.input_buffer[:pos], self.config, self.ssl, self.remote_host)
 		self.output_buffer += val
 		self.write_output(False)
 		self.input_buffer = self.input_buffer[pos:]

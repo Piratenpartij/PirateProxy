@@ -65,7 +65,7 @@ class ProxyHandler(BaseHTTPRequestHandler):
 		if resp.status >= 300 and resp.status <= 400:
 			location = resp.getheader('location', None)
 			if location:
-				location = Util.rewrite_URL(location, self.server.config, self.is_ssl())
+				location = Util.rewrite_URL(location, self.server.config, self.is_ssl(), self.remote_host)
 			resp.newlocation = location
 		else:
 			resp.newlocation = None
@@ -112,18 +112,12 @@ class ProxyHandler(BaseHTTPRequestHandler):
 		if client and self.server.config.use_forwarded_for:
 			client = client.split(',')[-1].strip()
 			self.client_address = (client, self.client_address[1])
-
-		host = self.headers.getheader('host') or ''
-		if host:
-			p = host.find("."+self.server.config.hostname)
-			if p != -1:
-				self.remote_host = host[:p]
-			else:
-				self.remote_host = host
-		
-		self.server.reqs[threading.currentThread().name] = (self.remote_host, self.path)
 		if self.handle_own() or self.handle_robot_block():
 			return
+		self.remote_host = self.path.split('/')[1]
+		self.path = '/' + '/'.join(self.path.split('/')[2:])
+		self.server.reqs[threading.currentThread().name] = (self.remote_host, self.path)
+
 
 		# Redirect blocked hostnames and IP addresses to block target
 		if self.is_blocked(self.remote_host):
@@ -214,7 +208,6 @@ class ProxyHandler(BaseHTTPRequestHandler):
 			self.handle_redirect(resp)
 
 			content_type = resp.msg.gettype()
-
 			if content_type in ["text/html"]:
 				self.handle_rewritable(resp, Page)
 			elif content_type in ["application/xhtml+xml", "application/xml", "application/xhtml" ]:
@@ -257,11 +250,12 @@ class ProxyHandler(BaseHTTPRequestHandler):
 
 			for cookiename in c:
 				domain = c[cookiename].get('domain')
-				if domain:
-					# Need to strip as sometimes at least ',' is retained
-					domain = domain.strip(' \t\r\n,;')
-					domain = domain + "." + self.server.config.hostname
-					c[cookiename]['domain'] = domain
+				# Need to strip as sometimes at least ',' is retained
+				domain = domain.strip(' \t\r\n,;')
+				#domain = domain + "." + self.server.config.hostname
+				c[cookiename]['path'] = '/' + self.remote_host
+				domain = self.server.config.hostname
+				c[cookiename]['domain'] = domain
 			cookie = c.output()
 		except Exception, e:
 			self.my_log_error(traceback.format_exc())
@@ -281,7 +275,6 @@ class ProxyHandler(BaseHTTPRequestHandler):
 			self.gzip_from_server = True
 		else:
 			self.gzip_from_server = False
-
 
 		self.my_log_request(resp.status, self.content_length)
 
@@ -313,7 +306,7 @@ class ProxyHandler(BaseHTTPRequestHandler):
 		# are given to the Page, JSPage or CSSPage instance to read blocks
 		# of data from the server response and write blocks of data to the
 		# client. Gzip-handling is done in the reader/writer.
-		p = rewriter_class(self.server.config, self.is_ssl(), self.reader, self.writer)
+		p = rewriter_class(self.server.config, self.is_ssl(), self.reader, self.writer, self.remote_host)
 		p.rewrite()
 	
 
@@ -479,26 +472,13 @@ class ProxyHandler(BaseHTTPRequestHandler):
 	# hostnames or non-existing host-header. Returns true if request was 
 	# handled here.
 	def handle_own(self):
-		host = self.headers.getheader('host')
-
-		if host:
-			a = host.rfind(":")
-			if a != -1 and len(host) > a:
-				if host[a+1:].isdigit():
-					host = host[:a]
-		else:
-			host = ''
-
-		if host.endswith(self.server.config.hostname) and host != self.server.config.hostname:
+		if self.path != '/' and self.path != '/index.html' and self.path != '/images/piratenpartijproxybanner.jpg' and self.path != '/favicon.ico':
 			return False
-
-		# This is for us, so handle it
 		try:
 			if os.path.isdir(self.server.config.files_location+"/"+self.path):
 				self.path += '/index.html'
 		except Exception, e:
 			pass
-
 		if self.path.find('..') != -1:
 			self.my_log_request(403, 0)
 			self.send_error(403)
