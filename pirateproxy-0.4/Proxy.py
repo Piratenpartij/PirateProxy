@@ -262,7 +262,7 @@ class ProxyHandler(BaseHTTPRequestHandler):
 					domain = domain.strip(' \t\r\n,;')
 					domain = domain + "." + self.server.config.hostname
 					c[cookiename]['domain'] = domain
-			cookie = c.output()
+			cookie = c.OutputString()
 		except Exception, e:
 			self.my_log_error(traceback.format_exc())
 			pass
